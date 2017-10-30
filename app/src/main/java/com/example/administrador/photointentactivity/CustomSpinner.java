@@ -1,21 +1,5 @@
 package com.example.administrador.photointentactivity;
 
-import android.graphics.drawable.BitmapDrawable;
-import android.os.AsyncTask;
-import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -23,7 +7,9 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -32,43 +18,272 @@ import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.Spinner;
 import android.widget.VideoView;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-public class PhotoIntentActivity extends Activity {
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
 
-    private static final int ACTION_TAKE_PHOTO_B = 1;
+/**
+ * Created by Administrador on 20/10/2017.
+ */
+
+public class CustomSpinner extends Activity implements View.OnClickListener{
+    /** Items entered by the user is stored in this ArrayList variable */
+    ArrayList<SpinnerModel> list = new ArrayList<SpinnerModel>();
+
+    /** Declaring an ArrayAdapter to set items to ListView */
+    SpinnerAdapter adapter;
+
+
+
     private static final int ACTION_TAKE_PHOTO_S = 2;
-    private static final int ACTION_TAKE_VIDEO = 3;
 
     private static final String BITMAP_STORAGE_KEY = "viewbitmap";
     private static final String IMAGEVIEW_VISIBILITY_STORAGE_KEY = "imageviewvisibility";
+
     private ImageView mImageView;
-    private ImageView ImageViewMaintenace;
 
     private Bitmap mImageBitmap;
 
-
-    private static final String VIDEO_STORAGE_KEY = "viewvideo";
-    private static final String VIDEOVIEW_VISIBILITY_STORAGE_KEY = "videoviewvisibility";
-    private VideoView mVideoView;
-    private Uri mVideoUri;
-
-    private String mCurrentPhotoPath;
-
-    private static final String JPEG_FILE_PREFIX = "IMG_";
-    private static final String JPEG_FILE_SUFFIX = ".jpg";
-
     private AlbumStorageDirFactory mAlbumStorageDirFactory = null;
-
-
 
     /******************************************************************/
     public String SERVER = "http://192.168.132.6/test_android/file_upload.php",
             timestamp;
     private static final String TAG = PhotoIntentActivity.class.getSimpleName();
     /******************************************************************/
+
+    private String mCurrentPhotoPath;
+
+
+    private static final String JPEG_FILE_PREFIX = "IMG_";
+    private static final String JPEG_FILE_SUFFIX = ".jpg";
+
+
+    private Spinner spinner;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.custom_spinner);
+
+        /** Defining the ArrayAdapter to set items to Spinner Widget */
+        adapter = new SpinnerAdapter(this, android.R.layout.simple_spinner_item, list);
+
+        /** Defining click event listener for the button */
+        View.OnClickListener listener = new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                EditText txtItem = (EditText) findViewById(R.id.editText);
+
+                SpinnerModel newSpinnerModel = new SpinnerModel(0, txtItem.getText().toString(), 0);
+
+                list.add(newSpinnerModel);
+
+
+
+
+                DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH.mm.ss");
+                Date date = new Date();
+
+                txtItem.setText(dateFormat.format(date));
+                adapter.notifyDataSetChanged();
+            }
+        };
+
+
+
+
+
+        /** Getting a reference to button object of the resource activity_main */
+        Button btnAdd = (Button) findViewById(R.id.button);
+        Button btnPopulate = (Button) findViewById(R.id.buttonPopulate);
+
+        /** Setting click listener for the button */
+        btnAdd.setOnClickListener(listener);
+        btnPopulate.setOnClickListener(this);
+
+        /** Getting a reference to Spinner object of the resource activity_main */
+        spinner = (Spinner) findViewById(R.id.my_spinner);
+
+        /** Setting the adapter to the ListView */
+        spinner.setAdapter(adapter);
+
+        /** Adding radio buttons for the spinner items */
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+
+
+
+
+
+
+
+
+
+
+
+
+        mImageView = (ImageView) findViewById(R.id.imageView);
+
+        mImageBitmap = null;
+
+
+        Button picBtn = (Button) findViewById(R.id.btnIntend);
+
+
+        Button picSBtn = (Button) findViewById(R.id.btnIntendS);
+        setBtnListenerOrDisable(
+                picSBtn,
+                mTakePicSOnClickListener,
+                MediaStore.ACTION_IMAGE_CAPTURE
+        );
+
+        /******************************************/
+        Button coppyBtn = findViewById(R.id.buttonCoppy);
+
+
+        coppyBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                maintenanceAdd();
+            }
+        });
+
+        /******************************************/
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.FROYO) {
+            mAlbumStorageDirFactory = new FroyoAlbumDirFactory();
+        } else {
+            mAlbumStorageDirFactory = new BaseAlbumDirFactory();
+        }
+
+
+
+    }
+
+    @Override
+    public void onClick(View v) {
+        String params[] = {"location_id"};
+        new ProcessJSON().execute(params);
+                /*list.add("load from thread");
+                adapter.notifyDataSetChanged();*/
+    }
+
+
+
+
+
+
+    private class ProcessJSON extends AsyncTask<String, Void, String> {
+        protected String doInBackground(String ... params){
+
+
+            String text = "";
+            BufferedReader reader=null;
+
+            String stringURL = "http://192.168.132.6/projecttaskmanager_web/index.php/services/list_locations";
+
+            Hashtable hashparams =new Hashtable();
+
+            hashparams.put("post_content",params[0]);
+
+            SenderReceiver sender = new SenderReceiver();
+
+            String  jsonstring= sender.getMessage(stringURL, hashparams);
+
+
+
+            try{
+
+                JSONObject  jsonRootObject = new JSONObject(jsonstring);
+
+                JSONArray jsonArray = jsonRootObject.optJSONArray("list_locations");
+
+                String strAdd = "";
+
+                for(int i=0; i < jsonArray.length(); i++){
+                    JSONObject jsonObject = jsonArray.getJSONObject(i);
+                    int id_location = Integer.parseInt(jsonObject.optString("id_location").toString());
+                    String location_name = jsonObject.optString("location_name").toString();
+                    String level = jsonObject.optString("level").toString();
+
+                    SpinnerModel newSpinnerModel = new SpinnerModel(id_location, location_name, Integer.parseInt(level));
+
+                    list.add(newSpinnerModel);
+                }
+            }
+            catch (JSONException ex){
+                ex.printStackTrace();
+            }
+
+                /*JSONArray st = new JSONArray(strjson);
+                for (int i = 0; i < st.length(); i++) {
+
+                    JSONObject obj = st.getJSONObject(i);
+
+                    list.add(obj.getString("pais"));
+                    // loop and add it to array or arraylist
+                }*/
+            //DEFAULT not important
+            return "";
+
+        }
+
+
+        protected void onPostExecute(String stream) {
+            //startActivity(new Intent(CustomSpinner.this, PhotoIntentActivity.class));
+
+            adapter.notifyDataSetChanged();
+        }
+
+        /* protected void onPostExecute(String stream) {
+            startActivity(new Intent(CustomSpinner.this, PhotoIntentActivity.class));
+        }*/
+
+
+
+       // onPostExecute() end
+    } // ProcessJSON class end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     /* Photo album for this application */
@@ -149,9 +364,9 @@ public class PhotoIntentActivity extends Activity {
 
 		/* Associate the Bitmap to the ImageView */
         mImageView.setImageBitmap(bitmap);
-        mVideoUri = null;
+
         mImageView.setVisibility(View.VISIBLE);
-        mVideoView.setVisibility(View.INVISIBLE);
+
     }
 
     private void galleryAddPic() {
@@ -166,67 +381,23 @@ public class PhotoIntentActivity extends Activity {
 
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
 
-        switch(actionCode) {
-            case ACTION_TAKE_PHOTO_B:
-                File f = null;
 
-                try {
-                    f = setUpPhotoFile();
-                    mCurrentPhotoPath = f.getAbsolutePath();
-                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(f));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    f = null;
-                    mCurrentPhotoPath = null;
-                }
-                break;
-
-            default:
-                break;
-        } // switch
 
         startActivityForResult(takePictureIntent, actionCode);
     }
 
-    private void dispatchTakeVideoIntent() {
-        Intent takeVideoIntent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
-        startActivityForResult(takeVideoIntent, ACTION_TAKE_VIDEO);
-    }
 
     private void handleSmallCameraPhoto(Intent intent) {
         Bundle extras = intent.getExtras();
         mImageBitmap = (Bitmap) extras.get("data");
         mImageView.setImageBitmap(mImageBitmap);
-        mVideoUri = null;
+
         mImageView.setVisibility(View.VISIBLE);
-        mVideoView.setVisibility(View.INVISIBLE);
-    }
-
-    private void handleBigCameraPhoto() {
-
-        if (mCurrentPhotoPath != null) {
-            setPic();
-            galleryAddPic();
-            mCurrentPhotoPath = null;
-        }
 
     }
 
-    private void handleCameraVideo(Intent intent) {
-        mVideoUri = intent.getData();
-        mVideoView.setVideoURI(mVideoUri);
-        mImageBitmap = null;
-        mVideoView.setVisibility(View.VISIBLE);
-        mImageView.setVisibility(View.INVISIBLE);
-    }
 
-    Button.OnClickListener mTakePicOnClickListener =
-            new Button.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    dispatchTakePictureIntent(ACTION_TAKE_PHOTO_B);
-                }
-            };
+
 
     Button.OnClickListener mTakePicSOnClickListener =
             new Button.OnClickListener() {
@@ -236,106 +407,25 @@ public class PhotoIntentActivity extends Activity {
                 }
             };
 
-    Button.OnClickListener mTakeVidOnClickListener =
-            new Button.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    dispatchTakeVideoIntent();
-                }
-            };
-
-    /** Called when the activity is first created. */
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_photo_intent);
-
-        mImageView = (ImageView) findViewById(R.id.imageView1);
-        mVideoView = (VideoView) findViewById(R.id.videoView1);
-        mImageBitmap = null;
-        mVideoUri = null;
-
-        Button picBtn = (Button) findViewById(R.id.btnIntend);
-        setBtnListenerOrDisable(
-                picBtn,
-                mTakePicOnClickListener,
-                MediaStore.ACTION_IMAGE_CAPTURE
-        );
-
-        Button picSBtn = (Button) findViewById(R.id.btnIntendS);
-        setBtnListenerOrDisable(
-                picSBtn,
-                mTakePicSOnClickListener,
-                MediaStore.ACTION_IMAGE_CAPTURE
-        );
-
-        Button vidBtn = (Button) findViewById(R.id.btnIntendV);
-        setBtnListenerOrDisable(
-                vidBtn,
-                mTakeVidOnClickListener,
-                MediaStore.ACTION_VIDEO_CAPTURE
-        );
-
-        /******************************************/
-        Button coppyBtn = findViewById(R.id.buttonCoppy);
-        ImageViewMaintenace = findViewById(R.id.imageViewCoppy);
-
-        coppyBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                maintenanceAdd();
-            }
-        });
-
-        /******************************************/
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.FROYO) {
-            mAlbumStorageDirFactory = new FroyoAlbumDirFactory();
-        } else {
-            mAlbumStorageDirFactory = new BaseAlbumDirFactory();
-        }
 
 
-        /****************************************************/
-        Button btnLoadJSON = (Button) this.findViewById(R.id.buttonLoadJSON);
-
-        btnLoadJSON.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                startActivity(new Intent(PhotoIntentActivity.this, CustomSpinner.class));
-            }
-        });
-
-
-        /****************************************************/
-        Button btnKardexSave = (Button) this.findViewById(R.id.kardexSave);
-
-        btnKardexSave.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                startActivity(new Intent(PhotoIntentActivity.this, KardexSave.class));
-            }
-        });
-
-
-    }
     /**********************************************************************/
     public void maintenanceAdd(){
         Bitmap bitmap = ((BitmapDrawable)mImageView.getDrawable()).getBitmap();
-        ImageViewMaintenace.setImageBitmap(bitmap);
 
-        SERVER = "http://192.168.132.6/index.php/services/maintenance_add";
+        //SERVER = "http://192.168.132.6/index.php/services/maintenance_add";
+        SERVER = "http://192.168.132.6/projecttaskmanager_web/index.php/services/add_support";
 
-        new Upload(bitmap,"IMG_"+timestamp).execute();
+        SpinnerModel model = (SpinnerModel) spinner.getSelectedItem();
+
+        String params[] = {""+model.getId()};
+        new CustomSpinner.Upload(bitmap,"IMG_"+timestamp).execute(params);
+
     }
     /***********************************************************************/
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
-            case ACTION_TAKE_PHOTO_B: {
-                if (resultCode == RESULT_OK) {
-                    handleBigCameraPhoto();
-                }
-                break;
-            } // ACTION_TAKE_PHOTO_B
 
             case ACTION_TAKE_PHOTO_S: {
                 if (resultCode == RESULT_OK) {
@@ -344,12 +434,7 @@ public class PhotoIntentActivity extends Activity {
                 break;
             } // ACTION_TAKE_PHOTO_S
 
-            case ACTION_TAKE_VIDEO: {
-                if (resultCode == RESULT_OK) {
-                    handleCameraVideo(data);
-                }
-                break;
-            } // ACTION_TAKE_VIDEO
+
         } // switch
     }
 
@@ -357,9 +442,9 @@ public class PhotoIntentActivity extends Activity {
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         outState.putParcelable(BITMAP_STORAGE_KEY, mImageBitmap);
-        outState.putParcelable(VIDEO_STORAGE_KEY, mVideoUri);
+
         outState.putBoolean(IMAGEVIEW_VISIBILITY_STORAGE_KEY, (mImageBitmap != null) );
-        outState.putBoolean(VIDEOVIEW_VISIBILITY_STORAGE_KEY, (mVideoUri != null) );
+
         super.onSaveInstanceState(outState);
     }
 
@@ -367,17 +452,13 @@ public class PhotoIntentActivity extends Activity {
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         mImageBitmap = savedInstanceState.getParcelable(BITMAP_STORAGE_KEY);
-        mVideoUri = savedInstanceState.getParcelable(VIDEO_STORAGE_KEY);
+
         mImageView.setImageBitmap(mImageBitmap);
         mImageView.setVisibility(
                 savedInstanceState.getBoolean(IMAGEVIEW_VISIBILITY_STORAGE_KEY) ?
                         ImageView.VISIBLE : ImageView.INVISIBLE
         );
-        mVideoView.setVideoURI(mVideoUri);
-        mVideoView.setVisibility(
-                savedInstanceState.getBoolean(VIDEOVIEW_VISIBILITY_STORAGE_KEY) ?
-                        ImageView.VISIBLE : ImageView.INVISIBLE
-        );
+
     }
 
     /**
@@ -441,7 +522,7 @@ public class PhotoIntentActivity extends Activity {
 
 
     //async task to upload image
-    private class Upload extends AsyncTask<Void,Void,String> {
+    private class Upload extends AsyncTask<String,Void,String> {
         private Bitmap image;
         private String name;
 
@@ -451,7 +532,7 @@ public class PhotoIntentActivity extends Activity {
         }
 
         @Override
-        protected String doInBackground(Void... params) {
+        protected String doInBackground(String... params) {
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             //compress the image to jpg format
             image.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream);
@@ -462,7 +543,18 @@ public class PhotoIntentActivity extends Activity {
 
             //generate hashMap to store encodedImage and the name
             HashMap<String, String> detail = new HashMap<>();
-            detail.put("name", name);
+
+
+            detail.put("location_id", (String) params[0]);
+            //detail.put("location_id", "2");
+
+
+            DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH.mm.ss");
+            Date date = new Date();
+            detail.put("name", dateFormat.format(date));
+
+
+
             detail.put("image", encodeImage);
 
             try {
@@ -481,6 +573,4 @@ public class PhotoIntentActivity extends Activity {
             }
         }
     }
-
-
 }

@@ -33,7 +33,7 @@
     <VideoView
         android:id="@+id/videoView1"
         android:layout_width="wrap_content"
-        android:layout_height="225dp"
+        android:layout_height="140dp"
         android:visibility="invisible" />
 
     <ImageView
@@ -48,4 +48,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Coppy" />
+
+    <Button
+        android:id="@+id/buttonLoadJSON"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Load JSON" />
+
+    <Button
+        android:id="@+id/kardexSave"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Kardex Save" />
 </LinearLayout>
